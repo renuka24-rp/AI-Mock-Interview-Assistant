@@ -5,6 +5,8 @@ import com.renuka.backend.dto.RegisterResponse;
 import com.renuka.backend.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
+import com.renuka.backend.dto.LoginRequest;
+import com.renuka.backend.dto.LoginResponse;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -23,6 +25,13 @@ public class UserController {
 
         return userService.register(request);
 
+
     }
+    @PostMapping("/login")
+public LoginResponse login(@RequestBody LoginRequest request) {
+
+    return userService.login(request);
+
+}
 
 }
