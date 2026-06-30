@@ -1,12 +1,18 @@
 package com.renuka.backend.service;
-import com.renuka.backend.dto.SubmitAnswerRequest;
-import com.renuka.backend.dto.NextQuestionResponse;
 
+import com.renuka.backend.ai.FeedbackGenerator;
 import com.renuka.backend.ai.QuestionBank;
+import com.renuka.backend.ai.ScoreCalculator;
+
+import com.renuka.backend.dto.InterviewResultResponse;
+import com.renuka.backend.dto.NextQuestionResponse;
 import com.renuka.backend.dto.StartInterviewRequest;
 import com.renuka.backend.dto.StartInterviewResponse;
+import com.renuka.backend.dto.SubmitAnswerRequest;
+
 import com.renuka.backend.entity.Interview;
 import com.renuka.backend.repository.InterviewRepository;
+
 import org.springframework.stereotype.Service;
 
 @Service
@@ -15,12 +21,13 @@ public class InterviewService {
     private final InterviewRepository repository;
 
     public InterviewService(InterviewRepository repository) {
-
         this.repository = repository;
-
     }
 
-    public StartInterviewResponse start(StartInterviewRequest request){
+    // =======================
+    // START INTERVIEW
+    // =======================
+    public StartInterviewResponse start(StartInterviewRequest request) {
 
         Interview interview = Interview.builder()
                 .interviewType(request.getInterviewType())
@@ -34,60 +41,96 @@ public class InterviewService {
 
         String firstQuestion;
 
-        if(request.getInterviewType().equalsIgnoreCase("JAVA")){
-
+        if (request.getInterviewType().equalsIgnoreCase("JAVA")) {
             firstQuestion = QuestionBank.JAVA.get(0);
-
-        }else{
-
+        } else {
             firstQuestion = QuestionBank.HR.get(0);
-
         }
 
-        return new StartInterviewResponse(interview.getId(), firstQuestion);
-
+        return new StartInterviewResponse(
+                interview.getId(),
+                firstQuestion
+        );
     }
-    public NextQuestionResponse submitAnswer(SubmitAnswerRequest request){
 
-    Interview interview =
-            repository.findById(request.getInterviewId())
-                    .orElseThrow();
+    // =======================
+    // SUBMIT ANSWER
+    // =======================
+    public NextQuestionResponse submitAnswer(SubmitAnswerRequest request) {
 
-    String oldAnswers =
-            interview.getAnswers()==null ? "" : interview.getAnswers();
+        Interview interview = repository.findById(request.getInterviewId())
+                .orElseThrow();
 
-    interview.setAnswers(oldAnswers + "\n" + request.getAnswer());
+        String oldAnswers =
+                interview.getAnswers() == null ? "" : interview.getAnswers();
 
-    interview.setCurrentQuestion(
-            interview.getCurrentQuestion()+1);
+        interview.setAnswers(oldAnswers + "\n" + request.getAnswer());
 
-    int index = interview.getCurrentQuestion();
+        interview.setCurrentQuestion(
+                interview.getCurrentQuestion() + 1
+        );
 
-    java.util.List<String> questions =
-            interview.getInterviewType().equalsIgnoreCase("JAVA")
-                    ? QuestionBank.JAVA
-                    : QuestionBank.HR;
+        int index = interview.getCurrentQuestion();
 
-    if(index>=questions.size()){
+        java.util.List<String> questions =
+                interview.getInterviewType().equalsIgnoreCase("JAVA")
+                        ? QuestionBank.JAVA
+                        : QuestionBank.HR;
 
-        interview.setCompleted(true);
+        if (index >= questions.size()) {
+
+            interview.setCompleted(true);
+
+            repository.save(interview);
+
+            return new NextQuestionResponse(
+                    true,
+                    "Interview Finished"
+            );
+        }
 
         repository.save(interview);
 
         return new NextQuestionResponse(
-                true,
-                "Interview Finished"
+                false,
+                questions.get(index)
         );
-
     }
 
-    repository.save(interview);
+    // =======================
+    // AI EVALUATION RESULT
+    // =======================
+    public InterviewResultResponse result(Long interviewId) {
 
-    return new NextQuestionResponse(
-            false,
-            questions.get(index)
-    );
+        Interview interview = repository.findById(interviewId)
+                .orElseThrow();
 
-}
+        int technical =
+                ScoreCalculator.technicalScore(interview.getAnswers());
+
+        int communication =
+                ScoreCalculator.communicationScore(interview.getAnswers());
+
+        int confidence =
+                ScoreCalculator.confidenceScore(interview.getAnswers());
+
+        int overall =
+                (technical + communication + confidence) / 3;
+
+        String feedback =
+                FeedbackGenerator.generate(
+                        technical,
+                        communication,
+                        confidence
+                );
+
+        return new InterviewResultResponse(
+                technical,
+                communication,
+                confidence,
+                overall,
+                feedback
+        );
+    }
 
 }
