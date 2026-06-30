@@ -1,9 +1,9 @@
 package com.renuka.backend.service;
 
-import com.renuka.backend.ai.FeedbackGenerator;
+import com.renuka.backend.ai.GeminiService;
 import com.renuka.backend.ai.QuestionBank;
-import com.renuka.backend.ai.ScoreCalculator;
 
+import com.renuka.backend.dto.AiEvaluationResponse;
 import com.renuka.backend.dto.InterviewResultResponse;
 import com.renuka.backend.dto.NextQuestionResponse;
 import com.renuka.backend.dto.StartInterviewRequest;
@@ -15,13 +15,20 @@ import com.renuka.backend.repository.InterviewRepository;
 
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class InterviewService {
 
     private final InterviewRepository repository;
+    private final GeminiService geminiService;
 
-    public InterviewService(InterviewRepository repository) {
+    public InterviewService(
+            InterviewRepository repository,
+            GeminiService geminiService) {
+
         this.repository = repository;
+        this.geminiService = geminiService;
     }
 
     // =======================
@@ -33,19 +40,18 @@ public class InterviewService {
                 .interviewType(request.getInterviewType())
                 .currentQuestion(0)
                 .completed(false)
-                .confidenceScore(0)
+                .technicalScore(0)
                 .communicationScore(0)
+                .confidenceScore(0)
+                .overallScore(0)
                 .build();
 
         repository.save(interview);
 
-        String firstQuestion;
-
-        if (request.getInterviewType().equalsIgnoreCase("JAVA")) {
-            firstQuestion = QuestionBank.JAVA.get(0);
-        } else {
-            firstQuestion = QuestionBank.HR.get(0);
-        }
+        String firstQuestion =
+                request.getInterviewType().equalsIgnoreCase("JAVA")
+                        ? QuestionBank.JAVA.get(0)
+                        : QuestionBank.HR.get(0);
 
         return new StartInterviewResponse(
                 interview.getId(),
@@ -72,7 +78,7 @@ public class InterviewService {
 
         int index = interview.getCurrentQuestion();
 
-        java.util.List<String> questions =
+        List<String> questions =
                 interview.getInterviewType().equalsIgnoreCase("JAVA")
                         ? QuestionBank.JAVA
                         : QuestionBank.HR;
@@ -80,7 +86,6 @@ public class InterviewService {
         if (index >= questions.size()) {
 
             interview.setCompleted(true);
-
             repository.save(interview);
 
             return new NextQuestionResponse(
@@ -105,31 +110,34 @@ public class InterviewService {
         Interview interview = repository.findById(interviewId)
                 .orElseThrow();
 
-        int technical =
-                ScoreCalculator.technicalScore(interview.getAnswers());
-
-        int communication =
-                ScoreCalculator.communicationScore(interview.getAnswers());
-
-        int confidence =
-                ScoreCalculator.confidenceScore(interview.getAnswers());
-
-        int overall =
-                (technical + communication + confidence) / 3;
-
-        String feedback =
-                FeedbackGenerator.generate(
-                        technical,
-                        communication,
-                        confidence
+        AiEvaluationResponse ai =
+                geminiService.evaluateAnswer(
+                        "Complete Interview Evaluation",
+                        interview.getAnswers()
                 );
 
+        // Save AI scores
+        interview.setTechnicalScore(ai.getTechnicalScore());
+        interview.setCommunicationScore(ai.getCommunicationScore());
+        interview.setConfidenceScore(ai.getConfidenceScore());
+        interview.setOverallScore(ai.getOverallScore());
+
+        interview.setFeedback(ai.getFeedback());
+        interview.setStrengths(ai.getStrengths());
+        interview.setWeaknesses(ai.getWeaknesses());
+        interview.setSuggestions(ai.getSuggestions());
+
+        repository.save(interview);
+
         return new InterviewResultResponse(
-                technical,
-                communication,
-                confidence,
-                overall,
-                feedback
+                ai.getTechnicalScore(),
+                ai.getCommunicationScore(),
+                ai.getConfidenceScore(),
+                ai.getOverallScore(),
+                ai.getFeedback(),
+                ai.getStrengths(),
+                ai.getWeaknesses(),
+                ai.getSuggestions()
         );
     }
 

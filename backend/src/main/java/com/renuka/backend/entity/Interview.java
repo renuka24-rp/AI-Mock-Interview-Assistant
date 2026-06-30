@@ -20,12 +20,30 @@ public class Interview {
 
     private int currentQuestion;
 
-    @Column(length = 5000)
+    @Column(columnDefinition = "TEXT")
     private String answers;
 
-    private int confidenceScore;
+    // AI Scores
+    private int technicalScore;
 
     private int communicationScore;
 
+    private int confidenceScore;
+
+    private int overallScore;
+
     private boolean completed;
+
+    // AI Feedback
+    @Column(columnDefinition = "TEXT")
+    private String feedback;
+
+    @Column(columnDefinition = "TEXT")
+    private String strengths;
+
+    @Column(columnDefinition = "TEXT")
+    private String weaknesses;
+
+    @Column(columnDefinition = "TEXT")
+    private String suggestions;
 }
