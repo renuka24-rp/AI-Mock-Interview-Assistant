@@ -1,18 +1,13 @@
 package com.renuka.backend.service;
 
-import com.renuka.backend.ai.GeminiService;
 import com.renuka.backend.ai.QuestionBank;
-
-import com.renuka.backend.dto.AiEvaluationResponse;
 import com.renuka.backend.dto.InterviewResultResponse;
 import com.renuka.backend.dto.NextQuestionResponse;
 import com.renuka.backend.dto.StartInterviewRequest;
 import com.renuka.backend.dto.StartInterviewResponse;
 import com.renuka.backend.dto.SubmitAnswerRequest;
-
 import com.renuka.backend.entity.Interview;
 import com.renuka.backend.repository.InterviewRepository;
-
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,14 +16,9 @@ import java.util.List;
 public class InterviewService {
 
     private final InterviewRepository repository;
-    private final GeminiService geminiService;
 
-    public InterviewService(
-            InterviewRepository repository,
-            GeminiService geminiService) {
-
+    public InterviewService(InterviewRepository repository) {
         this.repository = repository;
-        this.geminiService = geminiService;
     }
 
     // =======================
@@ -103,42 +93,27 @@ public class InterviewService {
     }
 
     // =======================
-    // AI EVALUATION RESULT
+    // RESULT
     // =======================
     public InterviewResultResponse result(Long interviewId) {
 
-        Interview interview = repository.findById(interviewId)
+        repository.findById(interviewId)
                 .orElseThrow();
 
-        AiEvaluationResponse ai =
-                geminiService.evaluateAnswer(
-                        "Complete Interview Evaluation",
-                        interview.getAnswers()
-                );
-
-        // Save AI scores
-        interview.setTechnicalScore(ai.getTechnicalScore());
-        interview.setCommunicationScore(ai.getCommunicationScore());
-        interview.setConfidenceScore(ai.getConfidenceScore());
-        interview.setOverallScore(ai.getOverallScore());
-
-        interview.setFeedback(ai.getFeedback());
-        interview.setStrengths(ai.getStrengths());
-        interview.setWeaknesses(ai.getWeaknesses());
-        interview.setSuggestions(ai.getSuggestions());
-
-        repository.save(interview);
+        int technical = 85;
+        int communication = 80;
+        int confidence = 82;
+        int overall = (technical + communication + confidence) / 3;
 
         return new InterviewResultResponse(
-                ai.getTechnicalScore(),
-                ai.getCommunicationScore(),
-                ai.getConfidenceScore(),
-                ai.getOverallScore(),
-                ai.getFeedback(),
-                ai.getStrengths(),
-                ai.getWeaknesses(),
-                ai.getSuggestions()
+                technical,
+                communication,
+                confidence,
+                overall,
+                "Good interview performance.",
+                "Strong Java fundamentals",
+                "Need more confidence while explaining concepts",
+                "Practice mock interviews regularly."
         );
     }
-
 }
